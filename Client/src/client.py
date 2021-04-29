@@ -1,4 +1,27 @@
-import sys, socket, json, threading
+import sys, socket, json, os, time
+from _thread import *
+
+
+def __handle_chat(chatting):
+    data, addr=udpSock.recvfrom(4096)
+    data=json.loads(data)
+    print(addr)
+    if (data["code"]==300) & (not chatting):
+        print("\nReceive request to chat from "+ data["nick-sender"])
+        chatting=True
+        response={"code": 301, "msg":"READY_TO_CHAT"}
+        udpSock.sendto(json.dumps(response).encode(), addr)
+
+
+def __start_chat(address, port):
+    friendAddr=(address, port)
+    data={"code": 300, "msg":"START_NEW_CHAT", "nick-sender": nickname}
+    udpSock.sendto(json.dumps(data).encode(), friendAddr)
+    response=udpSock.recv(4096)
+    response=json.loads(response)
+    if response["code"]==301:
+        sys.stdout.write("Starting chat with "+friend_nick+"\n")
+        sys.stdout.flush()
 
 nickname=input("Insert your nickname: ")
 ip=input("Insert your ip address: ")
@@ -22,16 +45,29 @@ if response["code"]==500:
     print(response["message"])
     sys.exit()
 
-'''I enter into the main cicle of the client'''
+
 connected=True
+chatting=False
+'''UDP socket instantiation'''
+udpSock=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+udpSock.bind((ip, port))
+
+start_new_thread(__handle_chat, (chatting,))
+sys.stdout.write("Commands available\n!help\n!connect\n!terminate\n!quit\n")
+time.sleep(3)
+
+'''I enter into the main cicle of the client'''
 while connected:
+    os.system("clear")
     command=input("What do you want to do? ")
 
     '''I check if there is a space inside the command receive and i split it'''
-    if command.__contains__(" "):
-        pos=command.index(" ")
-        command=command[:pos]
-        friend_nick=command[pos+1:]
+    if "!connect" in command:
+        command=command.split(" ", 2)
+        friend_nick=command[1]
+        command=command[0]
+        print(command)
+        print(friend_nick)
     
     if command=="!connect":
         data={"command": command, "nickname": friend_nick}
@@ -40,11 +76,10 @@ while connected:
         response=sock.recv(4096)
         response=json.loads(response)
         if response["code"]==200:
-            sys.stdout.write("Starting chat with "+friend_nick)
-            __start_chat(response["address"], response["port"])
+            __start_chat(response["ip"], response["port"])
         else:
-            sys.stdout.write(response["message"])
-        sys.stdout.flush()
+            sys.stdout.write(response["message"]+"\n")
+            sys.stdout.flush()
     elif command=="!quit":
 
         data={"command": command}
@@ -62,14 +97,13 @@ while connected:
         data=sock.recv(4096)
         data=json.loads(data)
         '''Print all commands available'''
+        sys.stdout.write("Command available\n")
         for i in data["commands"]:
-            sys.stdout.write(i)
+            sys.stdout.write(i+"\n")
             sys.stdout.flush()
     else:
         sys.stdout.write("Error, command not found")
         sys.stdout.flush()
+    time.sleep(4)
+
 sock.close()
-
-
-def __start_chat(self, address, port):
-    pass

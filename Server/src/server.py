@@ -4,45 +4,49 @@ from _thread import *
 def clienthandle(conn):
     connected=True
     nickname=""
-    while connected:
-        data=conn.recv(4096)
+    try:
+        while connected:
+            data=conn.recv(4096)
 
-        data=json.loads(data)
-        command=data["command"]
-        print(command)
-        if(command=="!new"):
-            nickname=data["nickname"]
-        elif(command=="!connect"):
-            friend_nick=data["nickname"]
-        global database
-        if command=="!new":
-            '''Check for the unicity of the nickname'''
-            if not data["nickname"] in database:
-                database[nickname]=(data["ip"], data["port"])
+            data=json.loads(data)
+            command=data["command"]
+            print(command)
+            if(command=="!new"):
+                nickname=data["nickname"]
+            elif(command=="!connect"):
+                friend_nick=data["nickname"]
+            global database
+            if command=="!new":
+                '''Check for the unicity of the nickname'''
+                if not data["nickname"] in database:
+                    database[nickname]=(data["ip"], data["port"])
+                    response={"code": 200}
+                else:
+                    response={"code": 500, "message": "Nickname already used"}
+
+                conn.sendall(json.dumps(response).encode())
+            elif command=="!connect":
+                print(friend_nick)
+                if (friend_nick in database.keys()):
+                    (ip,port)=database[friend_nick]
+                    response={"code": 200,
+                                "ip": ip,
+                                "port": port}
+                else:
+                    message="No user connected with nickname "+friend_nick
+                    response={"code": 500, "message": message}
+
+                conn.sendall(json.dumps(response).encode())
+            elif command=="!quit":
+                del database[nickname]
                 response={"code": 200}
-            else:
-                response={"code": 500, "message": "Nickname already used"}
-
-            conn.sendall(json.dumps(response).encode())
-        elif command=="!connect":
-            print(friend_nick)
-            if (friend_nick in database.keys()):
-                (ip,port)=database[friend_nick]
-                response={"code": 200,
-                            "ip": ip,
-                            "port": port}
-            else:
-                message="No user connected with nickname "+friend_nick
-                response={"code": 500, "message": message}
-
-            conn.sendall(json.dumps(response).encode())
-        elif command=="!quit":
-            database.pop(nickname)
-            response={"code": 200}
-            conn.sendall(json.dumps(response).encode())
-        elif command=="!help":
-            response={"code": 200, "commands": ["!help", "!connect", "!disconnect", "!quit"]}
-            conn.sendall(json.dumps(response).encode())
+                conn.sendall(json.dumps(response).encode())
+            elif command=="!help":
+                response={"code": 200, "commands": ["!help", "!connect", "!disconnect", "!terminate", "!quit"]}
+                conn.sendall(json.dumps(response).encode())
+    except json.JSONDecodeError:
+        del database[nickname]
+        
 
 IP='127.0.0.1'
 PORT=8081
