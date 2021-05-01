@@ -1,27 +1,59 @@
 import sys, socket, json, os, time
 from _thread import *
 
+'''-----------------UTILITY FUNCTIONS-----------------'''
+'''Function to start a new chat with a friend
+friendAddr: friend's address where we have to link
+'''
+def start_chat(udpSock, friendAddr, chatting):
+    while True:
+        if not chatting:
+            data={"code": 300, "msg": "START_NEW_CHAT"}
+            udpSock.sendto(json.dumps(data).encode(), friendAddr)
+            data, friendAddr=udpSock.recvfrom(4096)
+            data=json.loads(data)
+            if data["msg"]=="ALREADY_BUSY":
+                global friend_nick
+                print(friend_nick+"is already busy in a chat")
+                break
+            else:
+                chatting=True
+        else:
+            global nickname
+            msg=input(nickname+": ")
+            data={"code": 300, "msg": msg}
+            udpSock.sendto(json.dumps(data).encode(), friendAddr)
 
-def __handle_chat(chatting):
-    data, addr=udpSock.recvfrom(4096)
-    data=json.loads(data)
-    print(addr)
-    if (data["code"]==300) & (not chatting):
-        print("\nReceive request to chat from "+ data["nick-sender"])
-        chatting=True
-        response={"code": 301, "msg":"READY_TO_CHAT"}
-        udpSock.sendto(json.dumps(response).encode(), addr)
+'''Function to receive message from a chat
+udpSock: UDP socket to receive message
+chatting: boolean that specifies if we are chatting
+'''
+def handle_chat(udpSock, chatting):
+    while True:
+        data, friendAddr= udpSock.recvfrom(4096)
+        data=json.loads(data)
 
+        if (not chatting) & (data["msg"]=="START_NEW_CHAT"):
 
-def __start_chat(address, port):
-    friendAddr=(address, port)
-    data={"code": 300, "msg":"START_NEW_CHAT", "nick-sender": nickname}
-    udpSock.sendto(json.dumps(data).encode(), friendAddr)
-    response=udpSock.recv(4096)
-    response=json.loads(response)
-    if response["code"]==301:
-        sys.stdout.write("Starting chat with "+friend_nick+"\n")
-        sys.stdout.flush()
+            chatting=True
+            data={"code": 300, "msg": "READY_TO_CHAT"}
+            udpSock.sendto(json.dumps(data).encode(), friendAddr)
+            start_chat(udpSock, friendAddr, chatting)
+        
+        elif (chatting) & (data["msg"]=="START_NEW_CHAT"):
+
+            data={"code": 305, "msg": "ALREADY_BUSY"}
+            udpSock.sendto(json.dumps(data).encode(), friendAddr)
+
+        elif data["msg"]=="!terminate":
+            break
+
+        else:
+
+            global friend_nick
+            print(friend_nick+": "+data["msg"])
+
+'''-----------------MAIN SCRIPT-----------------'''
 
 nickname=input("Insert your nickname: ")
 ip=input("Insert your ip address: ")
@@ -52,13 +84,12 @@ chatting=False
 udpSock=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 udpSock.bind((ip, port))
 
-start_new_thread(__handle_chat, (chatting,))
+start_new_thread(handle_chat, (udpSock,chatting, ))
 sys.stdout.write("Commands available\n!help\n!connect\n!terminate\n!quit\n")
 time.sleep(3)
 
 '''I enter into the main cicle of the client'''
 while connected:
-    os.system("clear")
     command=input("What do you want to do? ")
 
     '''I check if there is a space inside the command receive and i split it'''
@@ -66,8 +97,6 @@ while connected:
         command=command.split(" ", 2)
         friend_nick=command[1]
         command=command[0]
-        print(command)
-        print(friend_nick)
     
     if command=="!connect":
         data={"command": command, "nickname": friend_nick}
@@ -76,7 +105,7 @@ while connected:
         response=sock.recv(4096)
         response=json.loads(response)
         if response["code"]==200:
-            __start_chat(response["ip"], response["port"])
+            start_chat(udpSock, (response["ip"], response["port"]), chatting)
         else:
             sys.stdout.write(response["message"]+"\n")
             sys.stdout.flush()
@@ -104,6 +133,5 @@ while connected:
     else:
         sys.stdout.write("Error, command not found")
         sys.stdout.flush()
-    time.sleep(4)
 
 sock.close()

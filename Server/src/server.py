@@ -26,9 +26,10 @@ def clienthandle(conn):
 
                 conn.sendall(json.dumps(response).encode())
             elif command=="!connect":
-                print(friend_nick)
+                print(database)
                 if (friend_nick in database.keys()):
                     (ip,port)=database[friend_nick]
+                    print(friend_nick+str(ip)+str(port))
                     response={"code": 200,
                                 "ip": ip,
                                 "port": port}
